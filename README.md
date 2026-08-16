@@ -2,7 +2,7 @@
 
 Сборщик ультра-минималистичного FFmpeg бинарника (размером **~3-5 МБ** вместо стандартных ~80-100 МБ), оптимизированного специально для десктопного приложения [LosslessRobot](https://github.com/yarchefis).
 
-Поддерживает полностью автоматизированную и ручную кросс-платформенную сборку под **Windows (`x86_64`)**, **Linux (`x86_64`, `arm64`)** и **macOS (`Universal Binary` / `Apple Silicon arm64` / `Intel x86_64`)** через GitHub Actions.
+Поддерживает полностью автоматизированную и ручную кросс-платформенную сборку под **Windows (`x86_64`)**, **Linux (`x86_64`, `arm64`)** и **macOS (`Universal Binary` / `Apple Silicon arm64` / `Intel x86_64`)** через GitHub Actions. Всегда собирает самую последнюю актуальную версию (latest).
 
 ---
 
@@ -34,22 +34,20 @@
 
 ## 🚀 Запуск сборки в GitHub Actions
 
-Вы можете запускать сборку как для всех платформ сразу, так и для каждой по отдельности:
+Вы можете запускать сборку с выбором платформ обычными **галочками (чекбоксами)**:
 
-1. Перейдите во вкладку **Actions** в GitHub репозитории: `https://github.com/yarchefis/ffmpeg-builder/actions`.
+1. Перейдите во вкладку **Actions**: [https://github.com/yarchefis/ffmpeg-builder/actions](https://github.com/yarchefis/ffmpeg-builder/actions).
 2. Выберите воркфлоу **Build Minimal FFmpeg**.
 3. Нажмите **Run workflow** справа вверху.
-4. Выберите параметры:
-   - **Target Platform**:
-     - `all` — собрать параллельно под все ОС (Windows, Linux x86_64/arm64, macOS Universal)
-     - `windows-x86_64` — только Windows x86_64 (`ffmpeg.exe`)
-     - `linux-x86_64` — только Linux x86_64 (статический binary)
-     - `linux-arm64` — только Linux ARM64
-     - `macos-universal` — универсальный бинарник под Intel + Apple Silicon M1/M2/M3/M4
-     - `macos-arm64` — только Apple Silicon
-     - `macos-x86_64` — только macOS Intel
-   - **FFmpeg version**: версия FFmpeg (по умолчанию `7.1`)
-   - **Create a GitHub Release**: поставьте галочку, если хотите автоматически опубликовать релиз с готовыми zip/tar.gz архивами.
+4. Отметьте нужные платформы галочками:
+   - ☑ **Windows (x86_64 .exe)**
+   - ☑ **Linux (x86_64 static)**
+   - ☐ **Linux (ARM64 static)**
+   - ☑ **macOS Universal (Apple Silicon + Intel)**
+   - ☐ **macOS (Apple Silicon arm64 only)**
+   - ☐ **macOS (Intel x86_64 only)**
+   - ☐ **Publish GitHub Release** (поставьте галочку, если нужно опубликовать релиз с готовыми архивами)
+5. Нажмите зеленую кнопку **Run workflow**.
 
 ### Автоматическая сборка при релизе (Git Tag):
 Если вы создадите и запушите тег с версией (например `v1.0.0`), GitHub Actions автоматически соберет бинарники для всех ОС и опубликует их в **Releases**:
@@ -66,21 +64,21 @@ git push origin v1.0.0
 
 ### Сборка под Windows (через кросс-компиляцию на Linux/WSL):
 ```bash
-sudo apt-get update && sudo apt-get install -y mingw-w64 nasm yasm pkg-config
+sudo apt-get update && sudo apt-get install -y mingw-w64 nasm yasm pkg-config git
 bash scripts/build-windows.sh
 # Результат: dist/ffmpeg-windows-x86_64.exe
 ```
 
 ### Сборка под Linux (статическая):
 ```bash
-sudo apt-get update && sudo apt-get install -y build-essential nasm yasm pkg-config
+sudo apt-get update && sudo apt-get install -y build-essential nasm yasm pkg-config git
 ARCH=x86_64 bash scripts/build-linux.sh
 # Результат: dist/ffmpeg-linux-x86_64
 ```
 
 ### Сборка под macOS:
 ```bash
-brew install nasm yasm pkg-config
+brew install nasm yasm pkg-config git
 ARCH=universal bash scripts/build-macos.sh
 # Результат: dist/ffmpeg-macos-universal
 ```

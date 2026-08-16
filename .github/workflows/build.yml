@@ -3,39 +3,34 @@ name: Build Minimal FFmpeg
 on:
   workflow_dispatch:
     inputs:
-      target:
-        description: 'Target Platform to build'
-        required: true
-        type: choice
-        default: 'all'
-        options:
-          - 'all'
-          - 'windows-x86_64'
-          - 'linux-x86_64'
-          - 'linux-arm64'
-          - 'macos-universal'
-          - 'macos-arm64'
-          - 'macos-x86_64'
-      ffmpeg_version:
-        description: 'FFmpeg version'
-        required: true
-        type: string
-        default: '7.1'
-      lame_version:
-        description: 'LAME version'
-        required: true
-        type: string
-        default: '3.100'
-      create_release:
-        description: 'Create a GitHub Release'
-        required: false
+      build_windows:
+        description: 'Windows (x86_64 .exe)'
+        type: boolean
+        default: true
+      build_linux_x86_64:
+        description: 'Linux (x86_64 static)'
+        type: boolean
+        default: true
+      build_linux_arm64:
+        description: 'Linux (ARM64 static)'
         type: boolean
         default: false
-      release_tag:
-        description: 'Release Tag (e.g. v1.0.0, required if Create Release is true and not triggered by tag)'
-        required: false
-        type: string
-        default: ''
+      build_macos_universal:
+        description: 'macOS Universal (Apple Silicon + Intel)'
+        type: boolean
+        default: true
+      build_macos_arm64:
+        description: 'macOS (Apple Silicon arm64 only)'
+        type: boolean
+        default: false
+      build_macos_x86_64:
+        description: 'macOS (Intel x86_64 only)'
+        type: boolean
+        default: false
+      create_release:
+        description: 'Publish GitHub Release'
+        type: boolean
+        default: false
   push:
     tags:
       - 'v*'
@@ -50,10 +45,7 @@ jobs:
   build-windows:
     name: Windows x86_64
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'push' || github.event.inputs.target == 'all' || github.event.inputs.target == 'windows-x86_64' }}
-    env:
-      FFMPEG_VERSION: ${{ github.event.inputs.ffmpeg_version || '7.1' }}
-      LAME_VERSION: ${{ github.event.inputs.lame_version || '3.100' }}
+    if: ${{ github.event_name == 'push' || github.event.inputs.build_windows == 'true' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -61,7 +53,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y mingw-w64 nasm yasm pkg-config zip
+          sudo apt-get install -y mingw-w64 nasm yasm pkg-config zip git
 
       - name: Build Windows x86_64 FFmpeg
         run: |
@@ -86,10 +78,7 @@ jobs:
   build-linux-x86_64:
     name: Linux x86_64
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'push' || github.event.inputs.target == 'all' || github.event.inputs.target == 'linux-x86_64' }}
-    env:
-      FFMPEG_VERSION: ${{ github.event.inputs.ffmpeg_version || '7.1' }}
-      LAME_VERSION: ${{ github.event.inputs.lame_version || '3.100' }}
+    if: ${{ github.event_name == 'push' || github.event.inputs.build_linux_x86_64 == 'true' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -97,7 +86,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential nasm yasm pkg-config
+          sudo apt-get install -y build-essential nasm yasm pkg-config git
 
       - name: Build Linux x86_64 FFmpeg
         run: |
@@ -126,10 +115,7 @@ jobs:
   build-linux-arm64:
     name: Linux ARM64
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'push' || github.event.inputs.target == 'all' || github.event.inputs.target == 'linux-arm64' }}
-    env:
-      FFMPEG_VERSION: ${{ github.event.inputs.ffmpeg_version || '7.1' }}
-      LAME_VERSION: ${{ github.event.inputs.lame_version || '3.100' }}
+    if: ${{ github.event_name == 'push' || github.event.inputs.build_linux_arm64 == 'true' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -137,7 +123,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu nasm yasm pkg-config
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu nasm yasm pkg-config git
 
       - name: Build Linux ARM64 FFmpeg
         run: |
@@ -160,55 +146,65 @@ jobs:
   # 4. macOS (Universal / arm64 / x86_64)
   # ============================================================================
   build-macos:
-    name: macOS ${{ github.event.inputs.target || 'Universal' }}
+    name: macOS Build
     runs-on: macos-latest
-    if: ${{ github.event_name == 'push' || github.event.inputs.target == 'all' || startsWith(github.event.inputs.target, 'macos') }}
-    env:
-      FFMPEG_VERSION: ${{ github.event.inputs.ffmpeg_version || '7.1' }}
-      LAME_VERSION: ${{ github.event.inputs.lame_version || '3.100' }}
+    if: ${{ github.event_name == 'push' || github.event.inputs.build_macos_universal == 'true' || github.event.inputs.build_macos_arm64 == 'true' || github.event.inputs.build_macos_x86_64 == 'true' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install build dependencies
         run: |
-          brew install nasm yasm pkg-config
+          brew install nasm yasm pkg-config git
 
-      - name: Determine macOS Target Arch
-        id: arch
-        run: |
-          TARGET="${{ github.event.inputs.target || 'macos-universal' }}"
-          if [ "${TARGET}" = "macos-arm64" ]; then
-            echo "arch=arm64" >> "$GITHUB_OUTPUT"
-            echo "pkg_name=ffmpeg-macos-arm64" >> "$GITHUB_OUTPUT"
-          elif [ "${TARGET}" = "macos-x86_64" ]; then
-            echo "arch=x86_64" >> "$GITHUB_OUTPUT"
-            echo "pkg_name=ffmpeg-macos-x86_64" >> "$GITHUB_OUTPUT"
-          else
-            echo "arch=universal" >> "$GITHUB_OUTPUT"
-            echo "pkg_name=ffmpeg-macos-universal" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Build macOS FFmpeg
+      - name: Build macOS Universal Binary
+        if: ${{ github.event_name == 'push' || github.event.inputs.build_macos_universal == 'true' }}
         run: |
           chmod +x scripts/*.sh
-          ARCH="${{ steps.arch.outputs.arch }}" bash scripts/build-macos.sh
-
-      - name: Verify macOS FFmpeg
-        run: |
-          bash scripts/verify.sh ./dist/ffmpeg
-
-      - name: Package macOS Binary
-        run: |
+          ARCH=universal bash scripts/build-macos.sh
+          bash scripts/verify.sh ./dist/ffmpeg-macos-universal
           cd dist
-          PKG_NAME="${{ steps.arch.outputs.pkg_name }}"
-          tar -czf "${PKG_NAME}.tar.gz" *
+          tar -czf ffmpeg-macos-universal.tar.gz ffmpeg-macos-universal ffmpeg
 
-      - name: Upload macOS Artifact
+      - name: Upload macOS Universal Artifact
+        if: ${{ github.event_name == 'push' || github.event.inputs.build_macos_universal == 'true' }}
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.arch.outputs.pkg_name }}
-          path: dist/${{ steps.arch.outputs.pkg_name }}.tar.gz
+          name: ffmpeg-macos-universal
+          path: dist/ffmpeg-macos-universal.tar.gz
+          retention-days: 14
+
+      - name: Build macOS ARM64 Binary
+        if: ${{ github.event.inputs.build_macos_arm64 == 'true' }}
+        run: |
+          chmod +x scripts/*.sh
+          ARCH=arm64 bash scripts/build-macos.sh
+          bash scripts/verify.sh ./dist/ffmpeg-macos-arm64
+          cd dist
+          tar -czf ffmpeg-macos-arm64.tar.gz ffmpeg-macos-arm64 ffmpeg
+
+      - name: Upload macOS ARM64 Artifact
+        if: ${{ github.event.inputs.build_macos_arm64 == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-macos-arm64
+          path: dist/ffmpeg-macos-arm64.tar.gz
+          retention-days: 14
+
+      - name: Build macOS x86_64 Binary
+        if: ${{ github.event.inputs.build_macos_x86_64 == 'true' }}
+        run: |
+          chmod +x scripts/*.sh
+          ARCH=x86_64 bash scripts/build-macos.sh
+          cd dist
+          tar -czf ffmpeg-macos-x86_64.tar.gz ffmpeg-macos-x86_64 ffmpeg
+
+      - name: Upload macOS x86_64 Artifact
+        if: ${{ github.event.inputs.build_macos_x86_64 == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-macos-x86_64
+          path: dist/ffmpeg-macos-x86_64.tar.gz
           retention-days: 14
 
   # ============================================================================
@@ -233,10 +229,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "push" ]; then
             TAG="${GITHUB_REF#refs/tags/}"
-          elif [ -n "${{ github.event.inputs.release_tag }}" ]; then
-            TAG="${{ github.event.inputs.release_tag }}"
           else
-            TAG="v${{ github.event.inputs.ffmpeg_version || '7.1' }}-$(date +'%Y%m%d')"
+            TAG="v$(date +'%Y.%m.%d-%H%M')"
           fi
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
 

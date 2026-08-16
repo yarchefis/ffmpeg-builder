@@ -5,7 +5,7 @@ set -euo pipefail
 # build-ffmpeg.sh: Minimal audio-only FFmpeg build for LosslessRobot Desktop
 # ==============================================================================
 
-FFMPEG_VERSION="${FFMPEG_VERSION:-7.1}"
+FFMPEG_VERSION="${FFMPEG_VERSION:-latest}"
 PREFIX="${PREFIX:-$(pwd)/prefix}"
 DIST_DIR="${DIST_DIR:-$(pwd)/dist}"
 BUILD_DIR="${BUILD_DIR:-$(pwd)/build/ffmpeg}"
@@ -23,7 +23,7 @@ EXTRA_CONF_ARGS="${EXTRA_CONF_ARGS:-}"
 
 JOBS=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 
-echo "=== Building Minimal FFmpeg v${FFMPEG_VERSION} ==="
+echo "=== Building Minimal FFmpeg (${FFMPEG_VERSION}) ==="
 echo "Target OS:    ${TARGET_OS:-native}"
 echo "Arch:         ${ARCH:-native}"
 echo "Cross Prefix: ${CROSS_PREFIX:-none}"
@@ -34,22 +34,28 @@ echo "Jobs:         ${JOBS}"
 mkdir -p "${BUILD_DIR}"
 mkdir -p "${DIST_DIR}"
 
-TARBALL_NAME="ffmpeg-${FFMPEG_VERSION}.tar.xz"
-DOWNLOAD_URL="https://ffmpeg.org/releases/${TARBALL_NAME}"
-
-cd "${BUILD_DIR}"
-
-if [ ! -f "${TARBALL_NAME}" ]; then
-    echo "--> Downloading FFmpeg ${FFMPEG_VERSION}..."
-    curl -fsSL "${DOWNLOAD_URL}" -o "${TARBALL_NAME}" || \
-    curl -fsSL "https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n${FFMPEG_VERSION}.tar.gz" -o "${TARBALL_NAME}"
-fi
-
-SRC_DIR="ffmpeg-${FFMPEG_VERSION}"
-if [ ! -d "${SRC_DIR}" ]; then
-    echo "--> Extracting ${TARBALL_NAME}..."
-    mkdir -p "${SRC_DIR}"
-    tar -xf "${TARBALL_NAME}" --strip-components=1 -C "${SRC_DIR}"
+if [ "${FFMPEG_VERSION}" = "latest" ]; then
+    SRC_DIR="${BUILD_DIR}/ffmpeg-latest"
+    if [ ! -d "${SRC_DIR}" ]; then
+        echo "--> Fetching latest FFmpeg source..."
+        git clone --depth 1 https://github.com/FFmpeg/FFmpeg.git "${SRC_DIR}" || \
+        git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git "${SRC_DIR}"
+    fi
+else
+    TARBALL_NAME="ffmpeg-${FFMPEG_VERSION}.tar.xz"
+    DOWNLOAD_URL="https://ffmpeg.org/releases/${TARBALL_NAME}"
+    cd "${BUILD_DIR}"
+    if [ ! -f "${TARBALL_NAME}" ]; then
+        echo "--> Downloading FFmpeg ${FFMPEG_VERSION}..."
+        curl -fsSL "${DOWNLOAD_URL}" -o "${TARBALL_NAME}" || \
+        curl -fsSL "https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n${FFMPEG_VERSION}.tar.gz" -o "${TARBALL_NAME}"
+    fi
+    SRC_DIR="${BUILD_DIR}/ffmpeg-${FFMPEG_VERSION}"
+    if [ ! -d "${SRC_DIR}" ]; then
+        echo "--> Extracting ${TARBALL_NAME}..."
+        mkdir -p "${SRC_DIR}"
+        tar -xf "${TARBALL_NAME}" --strip-components=1 -C "${SRC_DIR}"
+    fi
 fi
 
 cd "${SRC_DIR}"
