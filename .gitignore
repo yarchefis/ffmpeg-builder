@@ -1,0 +1,36 @@
+# Build directories
+build/
+dist/
+dist_minimal/
+stage/
+out/
+deps/
+prefix/
+
+# Source trees downloaded during build
+ffmpeg-*/
+lame-*/
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.zip
+
+# Compiled binaries
+ffmpeg
+ffmpeg.exe
+ffprobe
+ffprobe.exe
+*.a
+*.o
+*.obj
+*.dll
+*.dylib
+*.so
+
+# System and editor files
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/

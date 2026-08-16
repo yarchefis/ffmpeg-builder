@@ -1,0 +1,276 @@
+name: Build Minimal FFmpeg
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Target Platform to build'
+        required: true
+        type: choice
+        default: 'all'
+        options:
+          - 'all'
+          - 'windows-x86_64'
+          - 'linux-x86_64'
+          - 'linux-arm64'
+          - 'macos-universal'
+          - 'macos-arm64'
+          - 'macos-x86_64'
+      ffmpeg_version:
+        description: 'FFmpeg version'
+        required: true
+        type: string
+        default: '7.1'
+      lame_version:
+        description: 'LAME version'
+        required: true
+        type: string
+        default: '3.100'
+      create_release:
+        description: 'Create a GitHub Release'
+        required: false
+        type: boolean
+        default: false
+      release_tag:
+        description: 'Release Tag (e.g. v1.0.0, required if Create Release is true and not triggered by tag)'
+        required: false
+        type: string
+        default: ''
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  # ============================================================================
+  # 1. WINDOWS (x86_64 MinGW Cross-Compilation on Ubuntu)
+  # ============================================================================
+  build-windows:
+    name: Windows x86_64
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' || github.event.inputs.target == 'all' || github.event.inputs.target == 'windows-x86_64' }}
+    env:
+      FFMPEG_VERSION: ${{ github.event.inputs.ffmpeg_version || '7.1' }}
+      LAME_VERSION: ${{ github.event.inputs.lame_version || '3.100' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mingw-w64 nasm yasm pkg-config zip
+
+      - name: Build Windows x86_64 FFmpeg
+        run: |
+          chmod +x scripts/*.sh
+          bash scripts/build-windows.sh
+
+      - name: Package Windows Binary
+        run: |
+          cd dist
+          zip -9 ffmpeg-windows-x86_64.zip ffmpeg-windows-x86_64.exe ffmpeg.exe
+
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-windows-x86_64
+          path: dist/ffmpeg-windows-x86_64.zip
+          retention-days: 14
+
+  # ============================================================================
+  # 2. LINUX (x86_64 Static Build)
+  # ============================================================================
+  build-linux-x86_64:
+    name: Linux x86_64
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' || github.event.inputs.target == 'all' || github.event.inputs.target == 'linux-x86_64' }}
+    env:
+      FFMPEG_VERSION: ${{ github.event.inputs.ffmpeg_version || '7.1' }}
+      LAME_VERSION: ${{ github.event.inputs.lame_version || '3.100' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential nasm yasm pkg-config
+
+      - name: Build Linux x86_64 FFmpeg
+        run: |
+          chmod +x scripts/*.sh
+          ARCH=x86_64 bash scripts/build-linux.sh
+
+      - name: Verify Linux x86_64 FFmpeg
+        run: |
+          bash scripts/verify.sh ./dist/ffmpeg-linux-x86_64
+
+      - name: Package Linux x86_64 Binary
+        run: |
+          cd dist
+          tar -czf ffmpeg-linux-x86_64.tar.gz ffmpeg-linux-x86_64 ffmpeg
+
+      - name: Upload Linux x86_64 Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-linux-x86_64
+          path: dist/ffmpeg-linux-x86_64.tar.gz
+          retention-days: 14
+
+  # ============================================================================
+  # 3. LINUX (ARM64 Cross-Compilation)
+  # ============================================================================
+  build-linux-arm64:
+    name: Linux ARM64
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' || github.event.inputs.target == 'all' || github.event.inputs.target == 'linux-arm64' }}
+    env:
+      FFMPEG_VERSION: ${{ github.event.inputs.ffmpeg_version || '7.1' }}
+      LAME_VERSION: ${{ github.event.inputs.lame_version || '3.100' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu nasm yasm pkg-config
+
+      - name: Build Linux ARM64 FFmpeg
+        run: |
+          chmod +x scripts/*.sh
+          ARCH=arm64 bash scripts/build-linux.sh
+
+      - name: Package Linux ARM64 Binary
+        run: |
+          cd dist
+          tar -czf ffmpeg-linux-arm64.tar.gz ffmpeg-linux-aarch64 ffmpeg
+
+      - name: Upload Linux ARM64 Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-linux-arm64
+          path: dist/ffmpeg-linux-arm64.tar.gz
+          retention-days: 14
+
+  # ============================================================================
+  # 4. macOS (Universal / arm64 / x86_64)
+  # ============================================================================
+  build-macos:
+    name: macOS ${{ github.event.inputs.target || 'Universal' }}
+    runs-on: macos-latest
+    if: ${{ github.event_name == 'push' || github.event.inputs.target == 'all' || startsWith(github.event.inputs.target, 'macos') }}
+    env:
+      FFMPEG_VERSION: ${{ github.event.inputs.ffmpeg_version || '7.1' }}
+      LAME_VERSION: ${{ github.event.inputs.lame_version || '3.100' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          brew install nasm yasm pkg-config
+
+      - name: Determine macOS Target Arch
+        id: arch
+        run: |
+          TARGET="${{ github.event.inputs.target || 'macos-universal' }}"
+          if [ "${TARGET}" = "macos-arm64" ]; then
+            echo "arch=arm64" >> "$GITHUB_OUTPUT"
+            echo "pkg_name=ffmpeg-macos-arm64" >> "$GITHUB_OUTPUT"
+          elif [ "${TARGET}" = "macos-x86_64" ]; then
+            echo "arch=x86_64" >> "$GITHUB_OUTPUT"
+            echo "pkg_name=ffmpeg-macos-x86_64" >> "$GITHUB_OUTPUT"
+          else
+            echo "arch=universal" >> "$GITHUB_OUTPUT"
+            echo "pkg_name=ffmpeg-macos-universal" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build macOS FFmpeg
+        run: |
+          chmod +x scripts/*.sh
+          ARCH="${{ steps.arch.outputs.arch }}" bash scripts/build-macos.sh
+
+      - name: Verify macOS FFmpeg
+        run: |
+          bash scripts/verify.sh ./dist/ffmpeg
+
+      - name: Package macOS Binary
+        run: |
+          cd dist
+          PKG_NAME="${{ steps.arch.outputs.pkg_name }}"
+          tar -czf "${PKG_NAME}.tar.gz" *
+
+      - name: Upload macOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.arch.outputs.pkg_name }}
+          path: dist/${{ steps.arch.outputs.pkg_name }}.tar.gz
+          retention-days: 14
+
+  # ============================================================================
+  # 5. RELEASE (Collect all artifacts & Publish GitHub Release)
+  # ============================================================================
+  release:
+    name: Create GitHub Release
+    needs: [build-windows, build-linux-x86_64, build-linux-arm64, build-macos]
+    if: |
+      always() &&
+      (
+        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true')
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Determine Release Tag
+        id: release_info
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          elif [ -n "${{ github.event.inputs.release_tag }}" ]; then
+            TAG="${{ github.event.inputs.release_tag }}"
+          else
+            TAG="v${{ github.event.inputs.ffmpeg_version || '7.1' }}-$(date +'%Y%m%d')"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release_artifacts
+          merge-multiple: true
+
+      - name: Generate Checksums
+        run: |
+          cd release_artifacts
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_info.outputs.tag }}
+          name: FFmpeg Minimal Audio Build ${{ steps.release_info.outputs.tag }}
+          draft: false
+          prerelease: false
+          files: |
+            release_artifacts/*
+          body: |
+            ### Minimal FFmpeg Audio-Only Build (${{ steps.release_info.outputs.tag }})
+            
+            Ultra-lightweight FFmpeg binaries tailored for audio remuxing, decoding, and transcoding.
+            
+            #### Included Components:
+            - **Decoders**: Dolby Atmos / E-AC-3 JOC, AC-3, AAC, FLAC, MP3, ALAC, Opus, Vorbis, PCM (s16/s24/s32/f32)
+            - **Encoders**: FLAC (24-bit s32), libmp3lame (MP3 320k), PCM (s16/s24)
+            - **Containers**: MP4 / M4A (ISO-BMFF DASH chunks), FLAC, MP3, WAV, OGG
+            - **Filters**: aresample, aformat, anull, swresample
+            
+            #### Checksums:
+            Check `SHA256SUMS.txt` for integrity verification.
