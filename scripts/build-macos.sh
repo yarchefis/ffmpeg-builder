@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ==============================================================================
-# build-macos.sh: Build minimal FFmpeg for macOS (arm64, x86_64, Universal)
+# build-macos.sh: Build minimal FFmpeg for macOS (Universal: Apple Silicon + Intel)
 # ==============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -31,6 +31,8 @@ build_single_arch() {
     fi
     
     # 1. Build LAME
+    CC="clang" \
+    CXX="clang++" \
     PREFIX="${PREFIX}" \
     BUILD_DIR="${BUILD_DIR}/lame" \
     HOST="${HOST_TRIPLE}" \
@@ -45,15 +47,16 @@ build_single_arch() {
     TARGET_OS="darwin" \
     ARCH="${ARCH}" \
     CC="clang" \
+    CXX="clang++" \
     OUTPUT_NAME="ffmpeg-macos-${ARCH}" \
     EXTRA_CFLAGS="-arch ${ARCH} -mmacosx-version-min=${MACOS_MIN_VER}" \
     EXTRA_LDFLAGS="-arch ${ARCH} -mmacosx-version-min=${MACOS_MIN_VER}" \
-    EXTRA_CONF_ARGS="--target-os=darwin --arch=${ARCH} --cc=clang" \
+    EXTRA_CONF_ARGS="" \
     bash "${SCRIPT_DIR}/build-ffmpeg.sh"
 }
 
 if [ "${TARGET_ARCH}" = "universal" ]; then
-    echo "Building Universal macOS binary (arm64 + x86_64)..."
+    echo "Building Universal macOS binary on Apple Silicon (arm64 + x86_64)..."
     build_single_arch "arm64"
     build_single_arch "x86_64"
     

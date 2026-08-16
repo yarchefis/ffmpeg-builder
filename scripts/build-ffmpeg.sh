@@ -62,7 +62,7 @@ cd "${SRC_DIR}"
 
 # Clean previous build if configured
 if [ -f Makefile ]; then
-    make distclean || true
+    make distclean 2>/dev/null || true
 fi
 
 # Set PKG_CONFIG_PATH for finding libmp3lame
@@ -84,7 +84,6 @@ CONF_FLAGS=(
     "--disable-audiotoolbox"
     "--disable-iconv"
     "--disable-symver"
-    "--enable-pthreads"
     "--enable-small"
     "--enable-static"
     "--disable-shared"
@@ -155,6 +154,13 @@ CONF_FLAGS=(
     "--enable-avutil"
 )
 
+# Threading model: Windows uses w32threads, POSIX uses pthreads
+if [[ "${TARGET_OS}" == *"mingw"* ]] || [[ "${TARGET_OS}" == *"win"* ]]; then
+    CONF_FLAGS+=("--enable-w32threads")
+else
+    CONF_FLAGS+=("--enable-pthreads")
+fi
+
 # Cross compilation flags
 if [ -n "${TARGET_OS}" ]; then
     CONF_FLAGS+=("--enable-cross-compile" "--target-os=${TARGET_OS}")
@@ -192,7 +198,6 @@ CONF_FLAGS+=("--extra-cflags=${CFLAGS}")
 CONF_FLAGS+=("--extra-ldflags=${LDFLAGS}")
 
 if [ -n "${EXTRA_CONF_ARGS}" ]; then
-    # Add words from EXTRA_CONF_ARGS
     read -r -a EXTRA_ARRAY <<< "${EXTRA_CONF_ARGS}"
     CONF_FLAGS+=("${EXTRA_ARRAY[@]}")
 fi

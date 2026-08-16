@@ -23,15 +23,15 @@ mkdir -p "${BUILD_DIR}"
 mkdir -p "${PREFIX}/include" "${PREFIX}/lib" "${PREFIX}/lib/pkgconfig"
 
 TARBALL_NAME="lame-${LAME_VERSION}.tar.gz"
-DOWNLOAD_URL="https://downloads.sourceforge.net/project/lame/lame/${LAME_VERSION}/${TARBALL_NAME}"
 
 cd "${BUILD_DIR}"
 
 if [ ! -f "${TARBALL_NAME}" ]; then
     echo "--> Downloading LAME ${LAME_VERSION}..."
-    curl -fsSL "${DOWNLOAD_URL}" -o "${TARBALL_NAME}" || \
-    curl -fsSL "https://sourceforge.net/projects/lame/files/lame/${LAME_VERSION}/${TARBALL_NAME}/download" -o "${TARBALL_NAME}" || \
-    curl -fsSL "https://src.fedoraproject.org/repo/pkgs/lame/${TARBALL_NAME}/sha512/03e48817a001ee661c9ae37be8084a441e8c9dc756e18f8b809a47dd64293f0b2f56cc447a13d7cd4bdfcb82b9dc34ccbb5562dfd8e7529d499de02cfcc6b840/${TARBALL_NAME}" -o "${TARBALL_NAME}"
+    curl -fsSL -A "Mozilla/5.0" "https://sourceforge.net/projects/lame/files/lame/${LAME_VERSION}/${TARBALL_NAME}/download" -o "${TARBALL_NAME}" || \
+    curl -fsSL -A "Mozilla/5.0" "https://downloads.sourceforge.net/project/lame/lame/${LAME_VERSION}/${TARBALL_NAME}" -o "${TARBALL_NAME}" || \
+    curl -fsSL -A "Mozilla/5.0" "https://deb.debian.org/debian/pool/main/l/lame/lame_${LAME_VERSION}.orig.tar.gz" -o "${TARBALL_NAME}" || \
+    curl -fsSL -A "Mozilla/5.0" "https://src.fedoraproject.org/repo/pkgs/lame/${TARBALL_NAME}/sha512/03e48817a001ee661c9ae37be8084a441e8c9dc756e18f8b809a47dd64293f0b2f56cc447a13d7cd4bdfcb82b9dc34ccbb5562dfd8e7529d499de02cfcc6b840/${TARBALL_NAME}" -o "${TARBALL_NAME}"
 fi
 
 if [ ! -d "lame-${LAME_VERSION}" ]; then
@@ -43,7 +43,7 @@ cd "lame-${LAME_VERSION}"
 
 # Clean previous build if configured
 if [ -f Makefile ]; then
-    make distclean || true
+    make distclean 2>/dev/null || true
 fi
 
 CONF_ARGS=(
@@ -52,6 +52,8 @@ CONF_ARGS=(
     "--enable-static"
     "--disable-frontend"
     "--disable-decoder"
+    "--disable-nasm"
+    "--disable-x86-asm"
 )
 
 if [ -n "${HOST}" ]; then

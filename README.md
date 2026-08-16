@@ -2,7 +2,14 @@
 
 Сборщик ультра-минималистичного FFmpeg бинарника (размером **~3-5 МБ** вместо стандартных ~80-100 МБ), оптимизированного специально для десктопного приложения [LosslessRobot](https://github.com/yarchefis).
 
-Поддерживает полностью автоматизированную и ручную кросс-платформенную сборку под **Windows (`x86_64`)**, **Linux (`x86_64`, `arm64`)** и **macOS (`Universal Binary` / `Apple Silicon arm64` / `Intel x86_64`)** через GitHub Actions. Всегда собирает самую последнюю актуальную версию (latest).
+Поддерживает полностью автоматизированную и ручную кросс-платформенную сборку под:
+- **Windows x86_64** (`ffmpeg-windows-x86_64.exe`)
+- **Windows ARM64** (`ffmpeg-windows-arm64.exe`)
+- **Linux x86_64** (`ffmpeg-linux-x86_64` static)
+- **Linux ARM64** (`ffmpeg-linux-arm64` static)
+- **macOS Universal** (`ffmpeg-macos-universal` — Apple Silicon M1/M2/M3/M4 + Intel)
+
+Всегда собирает самую последнюю актуальную версию (latest).
 
 ---
 
@@ -40,12 +47,12 @@
 2. Выберите воркфлоу **Build Minimal FFmpeg**.
 3. Нажмите **Run workflow** справа вверху.
 4. Отметьте нужные платформы галочками:
-   - ☑ **Windows (x86_64 .exe)**
-   - ☑ **Linux (x86_64 static)**
-   - ☐ **Linux (ARM64 static)**
+   - ☑ **Windows x86_64 (.exe)**
+   - ☑ **Windows ARM64 (.exe)**
+   - ☑ **Linux x86_64 (static)**
+   - ☐ **Linux ARM64 (static)**
    - ☑ **macOS Universal (Apple Silicon + Intel)**
-   - ☐ **macOS (Apple Silicon arm64 only)**
-   - ☐ **macOS (Intel x86_64 only)**
+   - ☐ **macOS Apple Silicon (arm64 only)**
    - ☐ **Publish GitHub Release** (поставьте галочку, если нужно опубликовать релиз с готовыми архивами)
 5. Нажмите зеленую кнопку **Run workflow**.
 
@@ -62,25 +69,25 @@ git push origin v1.0.0
 
 Скрипты сборки расположены в папке `scripts/`:
 
-### Сборка под Windows (через кросс-компиляцию на Linux/WSL):
+### Сборка под Windows (x86_64 или ARM64):
 ```bash
-sudo apt-get update && sudo apt-get install -y mingw-w64 nasm yasm pkg-config git
-bash scripts/build-windows.sh
-# Результат: dist/ffmpeg-windows-x86_64.exe
+ARCH=x86_64 bash scripts/build-windows.sh
+# или для ARM64:
+ARCH=arm64 bash scripts/build-windows.sh
 ```
 
 ### Сборка под Linux (статическая):
 ```bash
-sudo apt-get update && sudo apt-get install -y build-essential nasm yasm pkg-config git
 ARCH=x86_64 bash scripts/build-linux.sh
-# Результат: dist/ffmpeg-linux-x86_64
+# или для ARM64:
+ARCH=arm64 bash scripts/build-linux.sh
 ```
 
 ### Сборка под macOS:
 ```bash
-brew install nasm yasm pkg-config git
 ARCH=universal bash scripts/build-macos.sh
-# Результат: dist/ffmpeg-macos-universal
+# или для Apple Silicon:
+ARCH=arm64 bash scripts/build-macos.sh
 ```
 
 ### Проверка сборки:

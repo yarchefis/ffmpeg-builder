@@ -3,16 +3,20 @@ name: Build Minimal FFmpeg
 on:
   workflow_dispatch:
     inputs:
-      build_windows:
-        description: 'Windows (x86_64 .exe)'
+      build_windows_x86_64:
+        description: 'Windows x86_64 (.exe)'
+        type: boolean
+        default: true
+      build_windows_arm64:
+        description: 'Windows ARM64 (.exe)'
         type: boolean
         default: true
       build_linux_x86_64:
-        description: 'Linux (x86_64 static)'
+        description: 'Linux x86_64 (static)'
         type: boolean
         default: true
       build_linux_arm64:
-        description: 'Linux (ARM64 static)'
+        description: 'Linux ARM64 (static)'
         type: boolean
         default: false
       build_macos_universal:
@@ -20,11 +24,7 @@ on:
         type: boolean
         default: true
       build_macos_arm64:
-        description: 'macOS (Apple Silicon arm64 only)'
-        type: boolean
-        default: false
-      build_macos_x86_64:
-        description: 'macOS (Intel x86_64 only)'
+        description: 'macOS Apple Silicon (arm64 only)'
         type: boolean
         default: false
       create_release:
@@ -40,32 +40,35 @@ permissions:
 
 jobs:
   # ============================================================================
-  # 1. WINDOWS (x86_64 MinGW Cross-Compilation on Ubuntu)
+  # 1. WINDOWS (x86_64 via llvm-mingw)
   # ============================================================================
-  build-windows:
+  build-windows-x86_64:
     name: Windows x86_64
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'push' || github.event.inputs.build_windows == 'true' }}
+    if: ${{ github.event_name == 'push' || github.event.inputs.build_windows_x86_64 == 'true' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install build dependencies
+      - name: Install llvm-mingw toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y mingw-w64 nasm yasm pkg-config zip git
+          sudo apt-get install -y nasm yasm pkg-config zip git
+          LLVM_MINGW_URL="https://github.com/mstorsjo/llvm-mingw/releases/download/20240917/llvm-mingw-20240917-ucrt-ubuntu-20.04-x86_64.tar.xz"
+          curl -fsSL "$LLVM_MINGW_URL" | tar -xJ -C /tmp
+          echo "/tmp/llvm-mingw-20240917-ucrt-ubuntu-20.04-x86_64/bin" >> $GITHUB_PATH
 
       - name: Build Windows x86_64 FFmpeg
         run: |
           chmod +x scripts/*.sh
-          bash scripts/build-windows.sh
+          ARCH=x86_64 bash scripts/build-windows.sh
 
-      - name: Package Windows Binary
+      - name: Package Windows x86_64 Binary
         run: |
           cd dist
           zip -9 ffmpeg-windows-x86_64.zip ffmpeg-windows-x86_64.exe ffmpeg.exe
 
-      - name: Upload Windows Artifact
+      - name: Upload Windows x86_64 Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ffmpeg-windows-x86_64
@@ -73,7 +76,43 @@ jobs:
           retention-days: 14
 
   # ============================================================================
-  # 2. LINUX (x86_64 Static Build)
+  # 2. WINDOWS (ARM64 via llvm-mingw)
+  # ============================================================================
+  build-windows-arm64:
+    name: Windows ARM64
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' || github.event.inputs.build_windows_arm64 == 'true' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install llvm-mingw toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nasm yasm pkg-config zip git
+          LLVM_MINGW_URL="https://github.com/mstorsjo/llvm-mingw/releases/download/20240917/llvm-mingw-20240917-ucrt-ubuntu-20.04-x86_64.tar.xz"
+          curl -fsSL "$LLVM_MINGW_URL" | tar -xJ -C /tmp
+          echo "/tmp/llvm-mingw-20240917-ucrt-ubuntu-20.04-x86_64/bin" >> $GITHUB_PATH
+
+      - name: Build Windows ARM64 FFmpeg
+        run: |
+          chmod +x scripts/*.sh
+          ARCH=arm64 bash scripts/build-windows.sh
+
+      - name: Package Windows ARM64 Binary
+        run: |
+          cd dist
+          zip -9 ffmpeg-windows-arm64.zip ffmpeg-windows-arm64.exe
+
+      - name: Upload Windows ARM64 Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-windows-arm64
+          path: dist/ffmpeg-windows-arm64.zip
+          retention-days: 14
+
+  # ============================================================================
+  # 3. LINUX (x86_64 Static Build)
   # ============================================================================
   build-linux-x86_64:
     name: Linux x86_64
@@ -110,7 +149,7 @@ jobs:
           retention-days: 14
 
   # ============================================================================
-  # 3. LINUX (ARM64 Cross-Compilation)
+  # 4. LINUX (ARM64 Cross-Compilation)
   # ============================================================================
   build-linux-arm64:
     name: Linux ARM64
@@ -143,12 +182,12 @@ jobs:
           retention-days: 14
 
   # ============================================================================
-  # 4. macOS (Universal / arm64 / x86_64)
+  # 5. macOS (Universal on Apple Silicon)
   # ============================================================================
   build-macos:
     name: macOS Build
     runs-on: macos-latest
-    if: ${{ github.event_name == 'push' || github.event.inputs.build_macos_universal == 'true' || github.event.inputs.build_macos_arm64 == 'true' || github.event.inputs.build_macos_x86_64 == 'true' }}
+    if: ${{ github.event_name == 'push' || github.event.inputs.build_macos_universal == 'true' || github.event.inputs.build_macos_arm64 == 'true' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -191,28 +230,12 @@ jobs:
           path: dist/ffmpeg-macos-arm64.tar.gz
           retention-days: 14
 
-      - name: Build macOS x86_64 Binary
-        if: ${{ github.event.inputs.build_macos_x86_64 == 'true' }}
-        run: |
-          chmod +x scripts/*.sh
-          ARCH=x86_64 bash scripts/build-macos.sh
-          cd dist
-          tar -czf ffmpeg-macos-x86_64.tar.gz ffmpeg-macos-x86_64 ffmpeg
-
-      - name: Upload macOS x86_64 Artifact
-        if: ${{ github.event.inputs.build_macos_x86_64 == 'true' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: ffmpeg-macos-x86_64
-          path: dist/ffmpeg-macos-x86_64.tar.gz
-          retention-days: 14
-
   # ============================================================================
-  # 5. RELEASE (Collect all artifacts & Publish GitHub Release)
+  # 6. RELEASE (Collect all artifacts & Publish GitHub Release)
   # ============================================================================
   release:
     name: Create GitHub Release
-    needs: [build-windows, build-linux-x86_64, build-linux-arm64, build-macos]
+    needs: [build-windows-x86_64, build-windows-arm64, build-linux-x86_64, build-linux-arm64, build-macos]
     if: |
       always() &&
       (
@@ -259,6 +282,13 @@ jobs:
             ### Minimal FFmpeg Audio-Only Build (${{ steps.release_info.outputs.tag }})
             
             Ultra-lightweight FFmpeg binaries tailored for audio remuxing, decoding, and transcoding.
+            
+            #### Included Platforms:
+            - Windows x86_64 (`ffmpeg-windows-x86_64.zip`)
+            - Windows ARM64 (`ffmpeg-windows-arm64.zip`)
+            - Linux x86_64 (`ffmpeg-linux-x86_64.tar.gz`)
+            - Linux ARM64 (`ffmpeg-linux-arm64.tar.gz`)
+            - macOS Universal: Apple Silicon + Intel (`ffmpeg-macos-universal.tar.gz`)
             
             #### Included Components:
             - **Decoders**: Dolby Atmos / E-AC-3 JOC, AC-3, AAC, FLAC, MP3, ALAC, Opus, Vorbis, PCM (s16/s24/s32/f32)
